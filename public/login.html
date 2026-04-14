@@ -48,33 +48,34 @@
 
     <div class="form-group">
       <label>Nom d'utilisateur</label>
-      <input type="text" id="username" placeholder="Ex : jean.dupont" autocomplete="username" autocapitalize="none">
+      <input type="text" id="inputUser" placeholder="Ex : jean.dupont" autocomplete="off" autocapitalize="none">
     </div>
     <div class="form-group">
       <label>Mot de passe</label>
-      <input type="password" id="password" placeholder="••••••••" autocomplete="current-password">
+      <input type="password" id="inputPass" placeholder="••••••••" autocomplete="off">
     </div>
-    <button class="btn" id="loginBtn" onclick="login()">Se connecter</button>
+    <button type="button" class="btn" id="loginBtn" onclick="doLogin()">Se connecter</button>
     <div class="error" id="errorMsg"></div>
   </div>
 
   <script>
     // Redirect if already logged in
-    const token = localStorage.getItem('doneo_token');
-    const role = localStorage.getItem('doneo_role');
-    if (token) {
-      if (role === 'admin') window.location.href = '/admin.html';
-      else window.location.href = '/operateur.html';
-    }
+    (function() {
+      var t = localStorage.getItem('doneo_token');
+      var r = localStorage.getItem('doneo_role');
+      if (t && r) {
+        window.location.replace(r === 'admin' ? '/admin.html' : '/operateur.html');
+      }
+    })();
 
-    async function login() {
-      const username = document.getElementById('username').value.trim();
-      const password = document.getElementById('password').value;
-      const btn = document.getElementById('loginBtn');
-      const err = document.getElementById('errorMsg');
+    function doLogin() {
+      var inputUser = document.getElementById('inputUser').value.trim();
+      var inputPass = document.getElementById('inputPass').value;
+      var btn = document.getElementById('loginBtn');
+      var err = document.getElementById('errorMsg');
       err.style.display = 'none';
 
-      if (!username || !password) {
+      if (!inputUser || !inputPass) {
         err.textContent = 'Veuillez remplir tous les champs.';
         err.style.display = 'block';
         return;
@@ -83,38 +84,40 @@
       btn.disabled = true;
       btn.innerHTML = '<span class="spinner"></span>Connexion...';
 
-      try {
-        const r = await fetch('/api/auth/login', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ username, password })
-        });
-        const data = await r.json();
-
+      fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: inputUser, password: inputPass })
+      })
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
         if (data.error) {
           err.textContent = data.error;
           err.style.display = 'block';
+          btn.disabled = false;
+          btn.textContent = 'Se connecter';
         } else {
           localStorage.setItem('doneo_token', data.token);
           localStorage.setItem('doneo_role', data.role);
           localStorage.setItem('doneo_username', data.username);
-          if (data.role === 'admin') window.location.href = '/admin.html';
-          else window.location.href = '/operateur.html';
+          window.location.replace(data.role === 'admin' ? '/admin.html' : '/operateur.html');
         }
-      } catch (e) {
+      })
+      .catch(function() {
         err.textContent = 'Erreur de connexion au serveur.';
         err.style.display = 'block';
-      }
-
-      btn.disabled = false;
-      btn.textContent = 'Se connecter';
+        btn.disabled = false;
+        btn.textContent = 'Se connecter';
+      });
     }
 
-    document.getElementById('password').addEventListener('keypress', e => {
-      if (e.key === 'Enter') login();
-    });
-    document.getElementById('username').addEventListener('keypress', e => {
-      if (e.key === 'Enter') document.getElementById('password').focus();
+    document.addEventListener('DOMContentLoaded', function() {
+      document.getElementById('inputPass').addEventListener('keydown', function(e) {
+        if (e.key === 'Enter') { e.preventDefault(); doLogin(); }
+      });
+      document.getElementById('inputUser').addEventListener('keydown', function(e) {
+        if (e.key === 'Enter') { e.preventDefault(); document.getElementById('inputPass').focus(); }
+      });
     });
   </script>
 </body>
