@@ -1,0 +1,550 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Opérateur — Doneo</title>
+  <!-- html5-qrcode pour scanner via caméra -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #f0f2f5;
+      color: #1a1a2e;
+      min-height: 100vh;
+    }
+
+    /* ── ÉCRAN DE SÉLECTION ─────────────────────── */
+    #screenSelect {
+      display: flex; flex-direction: column; min-height: 100vh;
+    }
+    .header {
+      background: #1a1a2e; color: #fff; padding: 16px 20px;
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .header-title { font-size: 1.1rem; font-weight: 700; }
+    .header-sub { font-size: .8rem; color: rgba(255,255,255,.6); margin-top: 1px; }
+    .back-link { color: rgba(255,255,255,.7); font-size: .875rem; text-decoration: none; }
+    .back-link:hover { color: #fff; }
+
+    .select-body { padding: 20px; flex: 1; }
+    .section-label { font-size: .8rem; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; color: #6b7280; margin-bottom: 10px; margin-top: 20px; }
+    .section-label:first-child { margin-top: 0; }
+
+    .operateur-input {
+      width: 100%; padding: 14px 16px; border: 2px solid #e5e7eb; border-radius: 12px;
+      font-size: 1rem; background: #fff; transition: border-color .2s;
+    }
+    .operateur-input:focus { outline: none; border-color: #1a1a2e; }
+
+    .tournee-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px; }
+    .tournee-btn {
+      background: #fff; border: 2px solid #e5e7eb; border-radius: 14px;
+      padding: 18px 12px; text-align: center; cursor: pointer;
+      transition: all .15s; font-size: 1rem; font-weight: 700; color: #1a1a2e;
+      display: flex; flex-direction: column; align-items: center; gap: 4px;
+    }
+    .tournee-btn:hover, .tournee-btn:active { border-color: #e63946; background: #fff5f5; transform: scale(.98); }
+    .tournee-btn .t-icon { font-size: 1.5rem; }
+    .tournee-btn .t-colis { font-size: .75rem; color: #9ca3af; font-weight: 400; }
+    .empty-state { text-align: center; padding: 48px 20px; color: #9ca3af; }
+    .empty-state-icon { font-size: 2.5rem; margin-bottom: 12px; }
+
+    /* ── ÉCRAN DE SCAN ──────────────────────────── */
+    #screenScan { display: none; flex-direction: column; min-height: 100vh; }
+    .scan-header {
+      background: #1a1a2e; color: #fff; padding: 16px 20px;
+      display: flex; align-items: center; gap: 14px;
+    }
+    .back-btn {
+      background: rgba(255,255,255,.15); border: none; color: #fff;
+      padding: 8px 12px; border-radius: 8px; cursor: pointer; font-size: .875rem;
+    }
+    .scan-header-info { flex: 1; }
+    .scan-tournee-name { font-size: 1.2rem; font-weight: 800; }
+    .scan-tournee-sub { font-size: .8rem; color: rgba(255,255,255,.6); }
+
+    /* Stats barre */
+    .scan-stats {
+      background: #fff; border-bottom: 1px solid #e5e7eb;
+      display: flex; padding: 12px 16px; gap: 16px;
+    }
+    .stat-item { flex: 1; text-align: center; }
+    .stat-item-value { font-size: 1.4rem; font-weight: 800; }
+    .stat-item-label { font-size: .7rem; color: #6b7280; text-transform: uppercase; letter-spacing: .05em; }
+    .stat-item.green .stat-item-value { color: #16a34a; }
+    .stat-item.red .stat-item-value { color: #dc2626; }
+    .stat-item.orange .stat-item-value { color: #ea580c; }
+    .stat-item.gray .stat-item-value { color: #9ca3af; }
+
+    /* Zone scan */
+    .scan-body { padding: 16px; flex: 1; }
+    .scan-modes { display: flex; gap: 8px; margin-bottom: 16px; }
+    .mode-btn {
+      flex: 1; padding: 12px; border: 2px solid #e5e7eb; border-radius: 12px;
+      background: #fff; cursor: pointer; font-size: .875rem; font-weight: 600;
+      text-align: center; transition: all .15s; color: #374151;
+    }
+    .mode-btn.active { border-color: #1a1a2e; background: #1a1a2e; color: #fff; }
+    .mode-btn .mode-icon { display: block; font-size: 1.4rem; margin-bottom: 4px; }
+
+    /* Mode clavier */
+    #modeClavier { display: block; }
+    .scan-input-wrap { position: relative; }
+    .scan-input {
+      width: 100%; padding: 18px 56px 18px 18px;
+      border: 2px solid #e5e7eb; border-radius: 14px;
+      font-size: 1.1rem; font-family: monospace; background: #fff;
+      transition: border-color .2s; letter-spacing: 1px;
+    }
+    .scan-input:focus { outline: none; border-color: #1a1a2e; }
+    .scan-send-btn {
+      position: absolute; right: 10px; top: 50%; transform: translateY(-50%);
+      background: #1a1a2e; color: #fff; border: none; border-radius: 10px;
+      padding: 10px 14px; cursor: pointer; font-size: 1rem;
+    }
+    .scan-hint { font-size: .8rem; color: #9ca3af; margin-top: 8px; text-align: center; }
+
+    /* Mode caméra */
+    #modeCamera { display: none; }
+    #reader {
+      width: 100%; max-width: 400px; margin: 0 auto;
+      border-radius: 14px; overflow: hidden; background: #000;
+    }
+    .camera-hint { text-align: center; font-size: .85rem; color: #6b7280; margin-top: 8px; }
+
+    /* Derniers scans */
+    .recent-label { font-size: .8rem; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; color: #6b7280; margin: 16px 0 8px; }
+    .recent-list { display: flex; flex-direction: column; gap: 6px; }
+    .recent-item {
+      background: #fff; border-radius: 10px; padding: 10px 14px;
+      display: flex; align-items: center; gap: 12px;
+      font-size: .875rem;
+    }
+    .recent-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+    .recent-dot.vert { background: #16a34a; }
+    .recent-dot.rouge { background: #dc2626; }
+    .recent-dot.orange { background: #ea580c; }
+    .recent-num { font-family: monospace; color: #374151; flex: 1; font-size: .8rem; }
+    .recent-label-text { font-size: .75rem; color: #9ca3af; }
+
+    /* ── ÉCRAN RÉSULTAT ─────────────────────────── */
+    #screenResult {
+      display: none; flex-direction: column;
+      min-height: 100vh; align-items: center; justify-content: center;
+      padding: 40px 24px; text-align: center;
+      animation: fadeIn .2s ease;
+    }
+    @keyframes fadeIn { from { opacity: 0; transform: scale(.96); } to { opacity: 1; transform: scale(1); } }
+
+    #screenResult.vert { background: #16a34a; color: #fff; }
+    #screenResult.rouge { background: #dc2626; color: #fff; }
+    #screenResult.orange { background: #ea580c; color: #fff; }
+
+    .result-icon { font-size: 6rem; margin-bottom: 24px; animation: popIn .3s ease; }
+    @keyframes popIn { from { transform: scale(.5); } to { transform: scale(1); } }
+    .result-title { font-size: 2rem; font-weight: 800; margin-bottom: 8px; }
+    .result-numero { font-family: monospace; font-size: 1.1rem; opacity: .8; margin-bottom: 16px; word-break: break-all; }
+    .result-detail { font-size: 1rem; opacity: .9; max-width: 320px; line-height: 1.5; margin-bottom: 40px; }
+    .result-continue {
+      background: rgba(255,255,255,.25); border: 2px solid rgba(255,255,255,.5);
+      color: #fff; padding: 16px 40px; border-radius: 14px;
+      font-size: 1.1rem; font-weight: 700; cursor: pointer;
+      transition: background .2s;
+    }
+    .result-continue:hover { background: rgba(255,255,255,.35); }
+    .result-auto { font-size: .8rem; opacity: .6; margin-top: 16px; }
+    .countdown-ring {
+      position: fixed; top: 20px; right: 20px;
+      width: 50px; height: 50px;
+    }
+    .countdown-ring circle {
+      fill: none; stroke: rgba(255,255,255,.3); stroke-width: 4;
+    }
+    .countdown-ring .progress {
+      stroke: rgba(255,255,255,.8);
+      stroke-dasharray: 126;
+      stroke-dashoffset: 0;
+      transform: rotate(-90deg);
+      transform-origin: center;
+      transition: stroke-dashoffset .1s linear;
+    }
+    .countdown-text {
+      position: fixed; top: 28px; right: 28px;
+      font-size: .9rem; font-weight: 700; color: rgba(255,255,255,.8);
+    }
+
+    /* Vibration indicator */
+    @keyframes shake { 0%,100%{transform:translateX(0)} 25%{transform:translateX(-8px)} 75%{transform:translateX(8px)} }
+    .shake { animation: shake .3s ease; }
+  </style>
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<!-- ÉCRAN 1 : SÉLECTION TOURNÉE + OPÉRATEUR                                -->
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<div id="screenSelect">
+  <div class="header">
+    <div>
+      <div class="header-title">Doneo — Scan</div>
+      <div class="header-sub">Sélectionnez votre tournée</div>
+    </div>
+    <a href="/" class="back-link">← Accueil</a>
+  </div>
+
+  <div class="select-body">
+    <div class="section-label">Votre nom</div>
+    <input
+      type="text"
+      class="operateur-input"
+      id="operateurName"
+      placeholder="Ex : Jean Dupont"
+      autocomplete="name"
+    >
+
+    <div class="section-label" style="margin-top:20px">Choisir une tournée</div>
+    <div class="tournee-grid" id="tourneeGrid">
+      <div class="empty-state">
+        <div class="empty-state-icon">⏳</div>
+        <div>Chargement des tournées...</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<!-- ÉCRAN 2 : SCAN                                                          -->
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<div id="screenScan">
+  <div class="scan-header">
+    <button class="back-btn" onclick="retourSelect()">← Changer</button>
+    <div class="scan-header-info">
+      <div class="scan-tournee-name" id="scanTourneeName">—</div>
+      <div class="scan-tournee-sub" id="scanOperateurName">—</div>
+    </div>
+  </div>
+
+  <!-- Stats -->
+  <div class="scan-stats">
+    <div class="stat-item green"><div class="stat-item-value" id="cntVert">0</div><div class="stat-item-label">OK</div></div>
+    <div class="stat-item red"><div class="stat-item-value" id="cntRouge">0</div><div class="stat-item-label">Erreur</div></div>
+    <div class="stat-item orange"><div class="stat-item-value" id="cntOrange">0</div><div class="stat-item-label">Inconnu</div></div>
+    <div class="stat-item gray"><div class="stat-item-value" id="cntTotal">0</div><div class="stat-item-label">Total</div></div>
+  </div>
+
+  <div class="scan-body">
+    <!-- Mode switch -->
+    <div class="scan-modes">
+      <div class="mode-btn active" id="modeKbdBtn" onclick="setMode('clavier')">
+        <span class="mode-icon">⌨️</span>
+        Douchette / Manuel
+      </div>
+      <div class="mode-btn" id="modeCamBtn" onclick="setMode('camera')">
+        <span class="mode-icon">📷</span>
+        Caméra
+      </div>
+    </div>
+
+    <!-- Mode clavier/douchette -->
+    <div id="modeClavier">
+      <div class="scan-input-wrap">
+        <input
+          type="text"
+          class="scan-input"
+          id="scanInput"
+          placeholder="Scanner ou saisir le code-barres..."
+          inputmode="numeric"
+          autocomplete="off"
+          autofocus
+        >
+        <button class="scan-send-btn" onclick="submitScan()">↵</button>
+      </div>
+      <div class="scan-hint">La douchette USB fonctionne directement dans ce champ</div>
+    </div>
+
+    <!-- Mode caméra -->
+    <div id="modeCamera">
+      <div id="reader"></div>
+      <div class="camera-hint">Pointez la caméra vers le code-barres du colis</div>
+    </div>
+
+    <!-- Scans récents -->
+    <div class="recent-label">Scans récents</div>
+    <div class="recent-list" id="recentList"></div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<!-- ÉCRAN 3 : RÉSULTAT                                                      -->
+<!-- ═══════════════════════════════════════════════════════════════════════ -->
+<div id="screenResult">
+  <svg class="countdown-ring" id="countdownRing" viewBox="0 0 50 50">
+    <circle cx="25" cy="25" r="20"/>
+    <circle class="progress" id="countdownProgress" cx="25" cy="25" r="20"/>
+  </svg>
+  <span class="countdown-text" id="countdownText"></span>
+
+  <div class="result-icon" id="resultIcon"></div>
+  <div class="result-title" id="resultTitle"></div>
+  <div class="result-numero" id="resultNumero"></div>
+  <div class="result-detail" id="resultDetail"></div>
+  <button class="result-continue" onclick="retourScan()">
+    Continuer le scan
+  </button>
+  <div class="result-auto" id="resultAuto">Retour automatique dans <span id="autoSec">3</span>s</div>
+</div>
+
+<script>
+// ─── ÉTAT ─────────────────────────────────────────────────────────────────
+let currentTourneeId = null;
+let currentTourneeName = null;
+let currentOperateur = 'Opérateur';
+let counters = { vert: 0, rouge: 0, orange: 0 };
+let recentScans = [];
+let autoTimer = null;
+let cameraScanner = null;
+let scanCooldown = false;  // empêche les doubles scans
+
+// ─── CHARGEMENT TOURNÉES ─────────────────────────────────────────────────
+function loadTournees() {
+  fetch('/api/tournees').then(r => r.json()).then(data => {
+    const grid = document.getElementById('tourneeGrid');
+    const active = data.filter(t => t.active);
+    if (!active.length) {
+      grid.innerHTML = `
+        <div class="empty-state" style="grid-column:1/-1">
+          <div class="empty-state-icon">📭</div>
+          <div>Aucune tournée disponible.<br>Importez d'abord une feuille de chargement.</div>
+        </div>`;
+      return;
+    }
+    grid.innerHTML = active.map(t => `
+      <div class="tournee-btn" onclick="selectTournee(${t.id}, '${t.nom.replace(/'/g, "\\'")}')">
+        <span class="t-icon">🚚</span>
+        <strong>${t.nom}</strong>
+        <span class="t-colis">${t.nb_livraisons} colis</span>
+      </div>
+    `).join('');
+  });
+}
+
+// ─── SÉLECTION TOURNÉE ──────────────────────────────────────────────────
+function selectTournee(id, nom) {
+  const operateur = document.getElementById('operateurName').value.trim() || 'Opérateur';
+  currentTourneeId = id;
+  currentTourneeName = nom;
+  currentOperateur = operateur;
+  counters = { vert: 0, rouge: 0, orange: 0 };
+  recentScans = [];
+
+  document.getElementById('scanTourneeName').textContent = nom;
+  document.getElementById('scanOperateurName').textContent = operateur;
+  updateCounters();
+  renderRecent();
+
+  document.getElementById('screenSelect').style.display = 'none';
+  document.getElementById('screenScan').style.display = 'flex';
+
+  // Focus sur l'input clavier
+  setTimeout(() => {
+    document.getElementById('scanInput').focus();
+  }, 100);
+}
+
+function retourSelect() {
+  stopCamera();
+  document.getElementById('screenScan').style.display = 'none';
+  document.getElementById('screenSelect').style.display = 'flex';
+  document.getElementById('screenResult').style.display = 'none';
+  loadTournees();
+}
+
+// ─── MODE SCAN ───────────────────────────────────────────────────────────
+function setMode(mode) {
+  document.getElementById('modeKbdBtn').classList.toggle('active', mode === 'clavier');
+  document.getElementById('modeCamBtn').classList.toggle('active', mode === 'camera');
+  document.getElementById('modeClavier').style.display = mode === 'clavier' ? 'block' : 'none';
+  document.getElementById('modeCamera').style.display = mode === 'camera' ? 'block' : 'none';
+
+  if (mode === 'clavier') {
+    stopCamera();
+    setTimeout(() => document.getElementById('scanInput').focus(), 100);
+  } else {
+    startCamera();
+  }
+}
+
+function startCamera() {
+  if (cameraScanner) return;
+  cameraScanner = new Html5Qrcode('reader');
+  cameraScanner.start(
+    { facingMode: 'environment' },
+    { fps: 10, qrbox: { width: 280, height: 140 }, aspectRatio: 1.6 },
+    (code) => {
+      if (scanCooldown) return;
+      sendScan(code);
+    },
+    () => {}
+  ).catch(err => {
+    document.getElementById('reader').innerHTML = `
+      <div style="padding:24px;text-align:center;color:#dc2626;background:#fef2f2;border-radius:12px">
+        ⚠️ Impossible d'accéder à la caméra.<br>
+        <small style="color:#9ca3af">Vérifiez les permissions ou utilisez la douchette.</small>
+      </div>`;
+  });
+}
+
+function stopCamera() {
+  if (cameraScanner) {
+    cameraScanner.stop().catch(() => {});
+    cameraScanner = null;
+  }
+}
+
+// ─── SOUMISSION SCAN ─────────────────────────────────────────────────────
+function submitScan() {
+  const input = document.getElementById('scanInput');
+  const code = input.value.trim();
+  input.value = '';
+  if (!code) return;
+  sendScan(code);
+}
+
+function sendScan(code) {
+  if (!code || scanCooldown) return;
+  scanCooldown = true;
+
+  fetch('/api/scan', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({
+      numero_colis: code,
+      tournee_id: currentTourneeId,
+      operateur: currentOperateur
+    })
+  })
+  .then(r => r.json())
+  .then(data => {
+    counters[data.resultat]++;
+    counters.total = (counters.vert + counters.rouge + counters.orange);
+    updateCounters();
+
+    // Ajouter aux scans récents
+    recentScans.unshift({ code, resultat: data.resultat, label: data.message });
+    if (recentScans.length > 5) recentScans.pop();
+    renderRecent();
+
+    // Vibration
+    if (navigator.vibrate) {
+      if (data.resultat === 'vert') navigator.vibrate(80);
+      else if (data.resultat === 'rouge') navigator.vibrate([150, 80, 150]);
+      else navigator.vibrate([80, 40, 80]);
+    }
+
+    showResult(data);
+  })
+  .catch(() => { scanCooldown = false; });
+}
+
+// ─── AFFICHAGE RÉSULTAT ──────────────────────────────────────────────────
+const RESULT_CONFIG = {
+  vert:   { icon: '✅', title: 'Conforme', duration: 3000 },
+  rouge:  { icon: '🚨', title: 'Mauvaise tournée', duration: 5000 },
+  orange: { icon: '⚠️', title: 'Colis inconnu', duration: 4000 }
+};
+
+function showResult(data) {
+  const cfg = RESULT_CONFIG[data.resultat];
+  const screen = document.getElementById('screenResult');
+
+  document.getElementById('resultIcon').textContent = cfg.icon;
+  document.getElementById('resultTitle').textContent = cfg.title;
+  document.getElementById('resultNumero').textContent = data.numero_colis;
+  document.getElementById('resultDetail').textContent = data.detail;
+  document.getElementById('autoSec').textContent = Math.round(cfg.duration / 1000);
+
+  screen.className = data.resultat;
+  screen.style.display = 'flex';
+
+  // Countdown ring
+  startCountdown(cfg.duration);
+}
+
+function startCountdown(duration) {
+  if (autoTimer) clearInterval(autoTimer);
+  const circumference = 126; // 2 * PI * 20
+  const progress = document.getElementById('countdownProgress');
+  const text = document.getElementById('countdownText');
+  const start = Date.now();
+
+  const tick = () => {
+    const elapsed = Date.now() - start;
+    const remaining = Math.max(0, duration - elapsed);
+    const fraction = remaining / duration;
+    progress.style.strokeDashoffset = circumference * (1 - fraction);
+    text.textContent = Math.ceil(remaining / 1000);
+
+    if (remaining <= 0) {
+      clearInterval(autoTimer);
+      retourScan();
+    }
+  };
+
+  tick();
+  autoTimer = setInterval(tick, 100);
+}
+
+function retourScan() {
+  if (autoTimer) { clearInterval(autoTimer); autoTimer = null; }
+  document.getElementById('screenResult').style.display = 'none';
+  document.getElementById('screenScan').style.display = 'flex';
+  scanCooldown = false;
+
+  // Si en mode clavier, refocus
+  if (document.getElementById('modeClavier').style.display !== 'none') {
+    setTimeout(() => document.getElementById('scanInput').focus(), 50);
+  }
+}
+
+// ─── COMPTEURS ────────────────────────────────────────────────────────────
+function updateCounters() {
+  document.getElementById('cntVert').textContent = counters.vert;
+  document.getElementById('cntRouge').textContent = counters.rouge;
+  document.getElementById('cntOrange').textContent = counters.orange;
+  document.getElementById('cntTotal').textContent = counters.vert + counters.rouge + counters.orange;
+}
+
+// ─── SCANS RÉCENTS ────────────────────────────────────────────────────────
+function renderRecent() {
+  const list = document.getElementById('recentList');
+  if (!recentScans.length) {
+    list.innerHTML = '<div style="text-align:center;color:#9ca3af;font-size:.85rem;padding:12px">Aucun scan encore</div>';
+    return;
+  }
+  list.innerHTML = recentScans.map(s => `
+    <div class="recent-item">
+      <div class="recent-dot ${s.resultat}"></div>
+      <div class="recent-num">${s.code}</div>
+      <div class="recent-label-text">${s.label}</div>
+    </div>
+  `).join('');
+}
+
+// ─── EVENTS ───────────────────────────────────────────────────────────────
+document.getElementById('scanInput').addEventListener('keypress', e => {
+  if (e.key === 'Enter') submitScan();
+});
+
+// Empêche la page de se scroller quand on est sur l'écran résultat
+document.getElementById('screenResult').addEventListener('click', e => {
+  if (e.target === document.getElementById('screenResult')) retourScan();
+});
+
+// ─── INIT ──────────────────────────────────────────────────────────────────
+loadTournees();
+renderRecent();
+</script>
+</body>
+</html>

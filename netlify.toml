@@ -1,0 +1,17 @@
+[build]
+  publish = "public"
+
+[functions]
+  directory = "netlify/functions"
+
+# Redirige tous les appels /api/* vers la Netlify Function
+[[redirects]]
+  from = "/api/*"
+  to = "/.netlify/functions/api"
+  status = 200
+
+# SPA fallback
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200

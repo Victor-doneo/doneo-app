@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Doneo — Contrôle des tournées</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #f0f2f5;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+    }
+    .logo {
+      font-size: 2.2rem;
+      font-weight: 800;
+      color: #1a1a2e;
+      margin-bottom: 6px;
+      letter-spacing: -1px;
+    }
+    .logo span { color: #e63946; }
+    .tagline {
+      color: #6b7280;
+      font-size: 1rem;
+      margin-bottom: 48px;
+    }
+    .cards {
+      display: flex;
+      gap: 20px;
+      flex-wrap: wrap;
+      justify-content: center;
+      max-width: 700px;
+    }
+    .card {
+      background: #fff;
+      border-radius: 16px;
+      padding: 36px 32px;
+      text-align: center;
+      cursor: pointer;
+      text-decoration: none;
+      color: inherit;
+      transition: transform .15s, box-shadow .15s;
+      box-shadow: 0 2px 12px rgba(0,0,0,.08);
+      flex: 1;
+      min-width: 260px;
+    }
+    .card:hover { transform: translateY(-4px); box-shadow: 0 8px 28px rgba(0,0,0,.14); }
+    .card-icon { font-size: 3rem; margin-bottom: 16px; }
+    .card-title { font-size: 1.25rem; font-weight: 700; margin-bottom: 8px; color: #1a1a2e; }
+    .card-desc { font-size: .9rem; color: #6b7280; line-height: 1.5; }
+    .card.admin .card-icon { filter: none; }
+    .card.admin { border-top: 4px solid #1a1a2e; }
+    .card.operateur { border-top: 4px solid #e63946; }
+    .footer {
+      margin-top: 48px;
+      font-size: .8rem;
+      color: #9ca3af;
+    }
+    .badge {
+      display: inline-block;
+      background: #f3f4f6;
+      border-radius: 20px;
+      padding: 4px 14px;
+      font-size: .75rem;
+      color: #374151;
+      margin-bottom: 32px;
+      font-weight: 500;
+    }
+  </style>
+</head>
+<body>
+  <div class="logo">Doneo <span>·</span> CChezVous</div>
+  <div class="tagline">Contrôle de conformité des tournées</div>
+
+  <div class="cards">
+    <a href="/admin" class="card admin">
+      <div class="card-icon">🖥️</div>
+      <div class="card-title">Back-office Admin</div>
+      <div class="card-desc">Importer les feuilles de tournée, gérer les données et consulter les anomalies.</div>
+    </a>
+    <a href="/operateur" class="card operateur">
+      <div class="card-icon">📦</div>
+      <div class="card-title">Interface Opérateur</div>
+      <div class="card-desc">Sélectionner une tournée et scanner les colis pour vérifier la conformité.</div>
+    </a>
+  </div>
+
+  <div class="footer">Doneo © 2025 — Logistique CChezVous</div>
+</body>
+</html>
