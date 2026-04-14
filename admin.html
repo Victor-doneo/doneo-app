@@ -178,9 +178,13 @@
       <div class="nav-item" data-page="historique" onclick="showPage('historique')">
         <span class="nav-icon">📋</span> Historique
       </div>
+      <div class="nav-item" data-page="utilisateurs" onclick="showPage('utilisateurs')">
+        <span class="nav-icon">👥</span> Utilisateurs
+      </div>
     </div>
     <div class="sidebar-footer">
-      <a href="/">← Accueil</a>
+      <div style="font-size:.8rem;color:rgba(255,255,255,.5);margin-bottom:8px" id="sidebarUser"></div>
+      <a href="#" onclick="logout()" style="color:rgba(255,255,255,.5);font-size:.8rem;text-decoration:none">← Déconnexion</a>
     </div>
   </nav>
 
@@ -328,6 +332,28 @@
           </table>
         </div>
       </div>
+    <!-- PAGE: UTILISATEURS -->
+    <div class="page" id="page-utilisateurs">
+      <div class="topbar">
+        <div>
+          <div class="page-title">Utilisateurs</div>
+          <div class="page-subtitle">Gestion des accès opérateurs et admins</div>
+        </div>
+        <button class="btn btn-primary btn-sm" onclick="openNewUser()">+ Nouvel utilisateur</button>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title-sm">👥 Liste des utilisateurs</div>
+          <button class="btn btn-ghost btn-sm" onclick="loadUsers()">↺ Rafraîchir</button>
+        </div>
+        <div class="card-body">
+          <table>
+            <thead><tr><th>Nom d'utilisateur</th><th>Rôle</th><th>Statut</th><th>Créé le</th><th>Actions</th></tr></thead>
+            <tbody id="usersTable"><tr><td colspan="5" class="empty">Chargement...</td></tr></tbody>
+          </table>
+        </div>
+      </div>
     </div>
 
   </main>
@@ -360,7 +386,46 @@
   </div>
 </div>
 
+<!-- MODAL UTILISATEUR -->
+<div class="modal-overlay" id="userModal" onclick="if(event.target===this)this.classList.remove('open')">
+  <div class="modal" onclick="event.stopPropagation()" style="max-width:420px;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
+      <div class="modal-title" id="userModalTitle">Nouvel utilisateur</div>
+      <span class="modal-close" onclick="document.getElementById('userModal').classList.remove('open')">✕</span>
+    </div>
+    <input type="hidden" id="userModalId">
+    <div class="form-group">
+      <label class="form-label">Nom d'utilisateur</label>
+      <input type="text" class="form-input" id="userModalUsername" placeholder="Ex: jean.dupont" autocapitalize="none">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Mot de passe <span id="userModalPwdHint" style="font-weight:400;color:#9ca3af">(laisser vide pour ne pas changer)</span></label>
+      <input type="password" class="form-input" id="userModalPassword" placeholder="••••••••">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Rôle</label>
+      <select class="form-input" id="userModalRole">
+        <option value="operateur">Opérateur</option>
+        <option value="admin">Admin</option>
+      </select>
+    </div>
+    <button class="btn btn-primary" style="width:100%" onclick="submitUser()">Enregistrer</button>
+  </div>
+</div>
+
 <script>
+// ─── AUTH ──────────────────────────────────────────────────────────────────
+const token = localStorage.getItem('doneo_token');
+const role = localStorage.getItem('doneo_role');
+const username = localStorage.getItem('doneo_username');
+if (!token) window.location.href = '/login.html';
+if (role !== 'admin') window.location.href = '/operateur.html';
+
+function authHeaders() {
+  return { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` };
+}
+function logout() { localStorage.clear(); window.location.href = '/login.html'; }
+
 // ─── NAVIGATION ────────────────────────────────────────────────────────────
 function showPage(name) {
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
@@ -370,6 +435,7 @@ function showPage(name) {
 
   if (name === 'tournees') { loadTournees(); loadStats(); }
   if (name === 'anomalies') loadAnomalies();
+  if (name === 'utilisateurs') loadUsers();
   if (name === 'historique') loadHistorique();
   if (name === 'import') loadImports();
 }
@@ -430,7 +496,7 @@ function uploadFile(file) {
 
     fetch('/api/import-pdf', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: authHeaders(),
       body: JSON.stringify({ filename: file.name, data: base64 })
     })
     .then(r => r.json())
@@ -468,7 +534,7 @@ function showImportResult(type, html) {
 
 // ─── IMPORTS HISTORY ──────────────────────────────────────────────────────
 function loadImports() {
-  fetch('/api/imports').then(r => r.json()).then(data => {
+  fetch('/api/imports', { headers: authHeaders() }).then(r => r.json()).then(data => {
     const tbody = document.getElementById('importsTable');
     if (!data.length) { tbody.innerHTML = '<tr><td colspan="5" class="empty">Aucun import</td></tr>'; return; }
     tbody.innerHTML = data.map(i => `
@@ -487,7 +553,7 @@ function loadImports() {
 let allTournees = [];
 
 function loadTournees() {
-  fetch('/api/tournees').then(r => r.json()).then(data => {
+  fetch('/api/tournees', { headers: authHeaders() }).then(r => r.json()).then(data => {
     allTournees = data;
     document.getElementById('statTournees').textContent = data.length;
     renderTournees(data);
@@ -526,11 +592,7 @@ function renderTournees(data) {
 }
 
 function toggleActive(id, val) {
-  fetch(`/api/tournees/${id}`, {
-    method: 'PUT',
-    headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({active: val ? 1 : 0})
-  });
+  fetch(`/api/tournees/${id}`, { method: 'PUT', headers: authHeaders(), body: JSON.stringify({active: val ? 1 : 0}) });
 }
 
 function openRename(id, nom) {
@@ -544,30 +606,22 @@ function submitRename() {
   const id = document.getElementById('renameId').value;
   const nom = document.getElementById('renameInput').value.trim();
   if (!nom) return;
-  fetch(`/api/tournees/${id}`, {
-    method: 'PUT',
-    headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({nom})
-  }).then(() => {
-    document.getElementById('renameModal').classList.remove('open');
-    loadTournees();
-  });
+  fetch(`/api/tournees/${id}`, { method: 'PUT', headers: authHeaders(), body: JSON.stringify({nom}) })
+    .then(() => { document.getElementById('renameModal').classList.remove('open'); loadTournees(); });
 }
 
 function closeRename(e) {
-  if (e.target === document.getElementById('renameModal')) {
-    document.getElementById('renameModal').classList.remove('open');
-  }
+  if (e.target === document.getElementById('renameModal')) document.getElementById('renameModal').classList.remove('open');
 }
 
 function deleteTournee(id, nom) {
   if (!confirm(`Supprimer la tournée "${nom}" et tous ses colis ?`)) return;
-  fetch(`/api/tournees/${id}`, { method: 'DELETE' }).then(() => loadTournees());
+  fetch(`/api/tournees/${id}`, { method: 'DELETE', headers: authHeaders() }).then(() => loadTournees());
 }
 
 // ─── STATS ─────────────────────────────────────────────────────────────────
 function loadStats() {
-  fetch('/api/anomalies').then(r => r.json()).then(data => {
+  fetch('/api/anomalies', { headers: authHeaders() }).then(r => r.json()).then(data => {
     document.getElementById('statScansOk').textContent = data.stats.scans_ok || 0;
     document.getElementById('statScansRouge').textContent = data.stats.scans_rouge || 0;
     document.getElementById('statScansOrange').textContent = data.stats.scans_orange || 0;
@@ -576,63 +630,56 @@ function loadStats() {
 
 // ─── DETAIL TOURNÉE ────────────────────────────────────────────────────────
 function showDetail(id) {
-  fetch(`/api/tournees/${id}`).then(r => r.json()).then(data => {
+  fetch(`/api/tournees/${id}`, { headers: authHeaders() }).then(r => r.json()).then(data => {
     const t = data.tournee;
     const colis = data.colis;
     const livraisons = colis.filter(c => c.type_prestation === 'Livraison');
     const reprises = colis.filter(c => c.type_prestation === 'Reprise');
-    const scannes = livraisons.filter(c => c.dernier_scan === 'vert');
-    const nonScannes = livraisons.filter(c => !c.dernier_scan);
-    const anomalies = livraisons.filter(c => c.dernier_scan && c.dernier_scan !== 'vert');
+    const ok = livraisons.filter(c => c.dernier_scan === 'vert');
+    const manquants = livraisons.filter(c => !c.dernier_scan);
+    const erreurs = livraisons.filter(c => c.dernier_scan === 'rouge');
 
     document.getElementById('modalTitle').textContent = `Tournée ${t.nom}`;
     document.getElementById('modalContent').innerHTML = `
       <div class="detail-grid">
-        <div class="detail-stat">
-          <div class="detail-stat-value" style="color:#1a1a2e">${livraisons.length}</div>
-          <div class="detail-stat-label">Colis à livrer</div>
-        </div>
-        <div class="detail-stat">
-          <div class="detail-stat-value" style="color:#16a34a">${scannes.length}</div>
-          <div class="detail-stat-label">Scannés OK</div>
-        </div>
-        <div class="detail-stat">
-          <div class="detail-stat-value" style="color:#9ca3af">${nonScannes.length}</div>
-          <div class="detail-stat-label">Non scannés</div>
-        </div>
+        <div class="detail-stat"><div class="detail-stat-value" style="color:#16a34a">${ok.length}</div><div class="detail-stat-label">✅ OK</div></div>
+        <div class="detail-stat"><div class="detail-stat-value" style="color:#9ca3af">${manquants.length}</div><div class="detail-stat-label">⏳ Manquants</div></div>
+        <div class="detail-stat"><div class="detail-stat-value" style="color:#dc2626">${erreurs.length}</div><div class="detail-stat-label">🚨 Erreurs</div></div>
       </div>
 
-      ${reprises.length > 0 ? `
-        <div class="alert alert-warning" style="margin-bottom:16px">
-          ℹ️ ${reprises.length} reprise(s) dans cette tournée — ces colis ne sont pas à scanner.
+      ${reprises.length > 0 ? `<div class="alert alert-warning" style="margin-bottom:16px">ℹ️ ${reprises.length} reprise(s) — non comptabilisées dans les scans.</div>` : ''}
+
+      ${manquants.length > 0 ? `
+        <div style="margin-bottom:14px">
+          <div style="font-size:.8rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#6b7280;margin-bottom:8px">⏳ Colis manquants (${manquants.length})</div>
+          <div style="display:flex;flex-wrap:wrap;gap:6px">
+            ${manquants.map(c => `<span style="font-family:monospace;font-size:.8rem;background:#f3f4f6;padding:3px 8px;border-radius:6px">${c.numero_colis}</span>`).join('')}
+          </div>
         </div>
       ` : ''}
 
       <table style="width:100%;border-collapse:collapse;font-size:.85rem;">
-        <thead>
-          <tr style="background:#f9fafb">
-            <th style="padding:8px 12px;text-align:left;border-bottom:1px solid #e5e7eb">N° Colis</th>
-            <th style="padding:8px 12px;text-align:left;border-bottom:1px solid #e5e7eb">Type</th>
-            <th style="padding:8px 12px;text-align:left;border-bottom:1px solid #e5e7eb">Statut scan</th>
-          </tr>
-        </thead>
+        <thead><tr style="background:#f9fafb">
+          <th style="padding:8px 12px;text-align:left;border-bottom:1px solid #e5e7eb">N° Colis</th>
+          <th style="padding:8px 12px;text-align:left;border-bottom:1px solid #e5e7eb">Type</th>
+          <th style="padding:8px 12px;text-align:left;border-bottom:1px solid #e5e7eb">Statut</th>
+        </tr></thead>
         <tbody>
-          ${colis.map(c => `
-            <tr>
-              <td style="padding:8px 12px;border-bottom:1px solid #f3f4f6;font-family:monospace">${c.numero_colis}</td>
-              <td style="padding:8px 12px;border-bottom:1px solid #f3f4f6">
-                ${c.type_prestation === 'Reprise'
-                  ? '<span class="badge badge-reprise">Reprise</span>'
-                  : '<span class="badge badge-blue">Livraison</span>'}
-              </td>
-              <td style="padding:8px 12px;border-bottom:1px solid #f3f4f6">
-                ${c.dernier_scan === 'vert' ? '<span class="badge badge-green">✓ Scanné</span>' :
-                  c.dernier_scan === 'rouge' ? '<span class="badge badge-red">⚠ Mauvaise tournée</span>' :
-                  c.dernier_scan === 'orange' ? '<span class="badge badge-orange">? Inconnu</span>' :
-                  '<span class="badge badge-gray">En attente</span>'}
-              </td>
-            </tr>
-          `).join('')}
+          ${livraisons.map(c => `<tr>
+            <td style="padding:7px 12px;border-bottom:1px solid #f3f4f6;font-family:monospace;font-size:.8rem">${c.numero_colis}</td>
+            <td style="padding:7px 12px;border-bottom:1px solid #f3f4f6"><span class="badge badge-blue">Livraison</span></td>
+            <td style="padding:7px 12px;border-bottom:1px solid #f3f4f6">
+              ${c.dernier_scan === 'vert' ? '<span class="badge badge-green">✓ OK</span>' :
+                c.dernier_scan === 'rouge' ? '<span class="badge badge-red">⚠ Erreur</span>' :
+                c.dernier_scan === 'bleu' ? '<span class="badge" style="background:#dbeafe;color:#1e40af">↩ Double scan</span>' :
+                '<span class="badge badge-gray">Manquant</span>'}
+            </td>
+          </tr>`).join('')}
+          ${reprises.map(c => `<tr>
+            <td style="padding:7px 12px;border-bottom:1px solid #f3f4f6;font-family:monospace;font-size:.8rem;opacity:.6">${c.numero_colis}</td>
+            <td style="padding:7px 12px;border-bottom:1px solid #f3f4f6"><span class="badge badge-reprise">Reprise</span></td>
+            <td style="padding:7px 12px;border-bottom:1px solid #f3f4f6"><span class="badge badge-gray">Non scanné</span></td>
+          </tr>`).join('')}
         </tbody>
       </table>
     `;
@@ -649,7 +696,7 @@ function closeModalDirect() {
 
 // ─── ANOMALIES ────────────────────────────────────────────────────────────
 function loadAnomalies() {
-  fetch('/api/anomalies').then(r => r.json()).then(data => {
+  fetch('/api/anomalies', { headers: authHeaders() }).then(r => r.json()).then(data => {
     document.getElementById('anomStatRouge').textContent = data.stats.scans_rouge || 0;
     document.getElementById('anomStatOrange').textContent = data.stats.scans_orange || 0;
     document.getElementById('anomStatOk').textContent = data.stats.scans_ok || 0;
@@ -690,7 +737,7 @@ function loadAnomalies() {
 
 // ─── HISTORIQUE ───────────────────────────────────────────────────────────
 function loadHistorique() {
-  fetch('/api/historique').then(r => r.json()).then(data => {
+  fetch('/api/historique', { headers: authHeaders() }).then(r => r.json()).then(data => {
     const tbody = document.getElementById('historiquetable');
     if (!data.length) { tbody.innerHTML = '<tr><td colspan="6" class="empty">Aucun scan enregistré</td></tr>'; return; }
     tbody.innerHTML = data.map(s => `
@@ -710,7 +757,7 @@ function loadHistorique() {
 
 function confirmReset() {
   if (!confirm('Êtes-vous sûr de vouloir supprimer tous les scans ? Cette action est irréversible.')) return;
-  fetch('/api/reset-scans', { method: 'POST' }).then(() => loadHistorique());
+  fetch('/api/reset-scans', { method: 'POST', headers: authHeaders() }).then(() => loadHistorique());
 }
 
 // ─── UTILS ────────────────────────────────────────────────────────────────
@@ -720,7 +767,83 @@ function formatDate(str) {
   return d.toLocaleString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
 }
 
+// ─── UTILISATEURS ──────────────────────────────────────────────────────────
+function loadUsers() {
+  fetch('/api/users', { headers: authHeaders() }).then(r => r.json()).then(data => {
+    const tbody = document.getElementById('usersTable');
+    if (!data.length) { tbody.innerHTML = '<tr><td colspan="5" class="empty">Aucun utilisateur</td></tr>'; return; }
+    tbody.innerHTML = data.map(u => `
+      <tr>
+        <td><strong>${u.username}</strong></td>
+        <td><span class="badge ${u.role === 'admin' ? 'badge-red' : 'badge-blue'}">${u.role === 'admin' ? '🔑 Admin' : '👤 Opérateur'}</span></td>
+        <td>${u.active ? '<span class="badge badge-green">Actif</span>' : '<span class="badge badge-gray">Inactif</span>'}</td>
+        <td style="font-size:.8rem;color:#6b7280">${formatDate(u.created_at)}</td>
+        <td style="display:flex;gap:6px;">
+          <button class="btn btn-ghost btn-sm" onclick="openEditUser(${u.id}, '${u.username}', '${u.role}')">✏️</button>
+          <button class="btn btn-ghost btn-sm" onclick="toggleUserActive(${u.id}, ${!u.active})">${u.active ? '🔒' : '🔓'}</button>
+          <button class="btn btn-danger btn-sm" onclick="deleteUser(${u.id}, '${u.username}')">🗑</button>
+        </td>
+      </tr>
+    `).join('');
+  });
+}
+
+function openNewUser() {
+  document.getElementById('userModalTitle').textContent = 'Nouvel utilisateur';
+  document.getElementById('userModalId').value = '';
+  document.getElementById('userModalUsername').value = '';
+  document.getElementById('userModalPassword').value = '';
+  document.getElementById('userModalRole').value = 'operateur';
+  document.getElementById('userModalPwdHint').style.display = 'none';
+  document.getElementById('userModal').classList.add('open');
+  setTimeout(() => document.getElementById('userModalUsername').focus(), 100);
+}
+
+function openEditUser(id, username, role) {
+  document.getElementById('userModalTitle').textContent = 'Modifier l\'utilisateur';
+  document.getElementById('userModalId').value = id;
+  document.getElementById('userModalUsername').value = username;
+  document.getElementById('userModalPassword').value = '';
+  document.getElementById('userModalRole').value = role;
+  document.getElementById('userModalPwdHint').style.display = 'inline';
+  document.getElementById('userModal').classList.add('open');
+}
+
+async function submitUser() {
+  const id = document.getElementById('userModalId').value;
+  const username = document.getElementById('userModalUsername').value.trim();
+  const password = document.getElementById('userModalPassword').value;
+  const role = document.getElementById('userModalRole').value;
+
+  if (!username) { alert('Nom d\'utilisateur requis'); return; }
+
+  if (id) {
+    // Mise à jour
+    const body = { role };
+    if (password) body.password = password;
+    await fetch(`/api/users/${id}`, { method: 'PUT', headers: authHeaders(), body: JSON.stringify(body) });
+  } else {
+    // Création
+    if (!password) { alert('Mot de passe requis pour un nouvel utilisateur'); return; }
+    await fetch('/api/users', { method: 'POST', headers: authHeaders(), body: JSON.stringify({ username, password, role }) });
+  }
+  document.getElementById('userModal').classList.remove('open');
+  loadUsers();
+}
+
+async function toggleUserActive(id, active) {
+  await fetch(`/api/users/${id}`, { method: 'PUT', headers: authHeaders(), body: JSON.stringify({ active }) });
+  loadUsers();
+}
+
+async function deleteUser(id, username) {
+  if (!confirm(`Supprimer l'utilisateur "${username}" ?`)) return;
+  await fetch(`/api/users/${id}`, { method: 'DELETE', headers: authHeaders() });
+  loadUsers();
+}
+
 // ─── INIT ──────────────────────────────────────────────────────────────────
+document.getElementById('sidebarUser').textContent = username ? `Connecté : ${username}` : '';
 loadImports();
 
 document.getElementById('renameInput').addEventListener('keypress', e => {
