@@ -44,7 +44,7 @@ async function parsePdf(buffer) {
       const dm = text.match(/(Lundi|Mardi|Mercredi|Jeudi|Vendredi|Samedi|Dimanche)\s+\d+\s+\w+/);
       if (dm) dateTournee = dm[0];
     }
-    const tm = text.match(/TOURNEE\s*(TA\d+[Cc][Aa][Mm][Ii][Oo][Nn]\S+)/);
+    const tm = text.match(/TOURNEE\s*([Tt][Aa]\d+[Cc][Aa][Mm][Ii][Oo][Nn]\S+)/);
     if (tm) {
       const code = tm[1].trim();
       if (!results[code]) {
