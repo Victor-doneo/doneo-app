@@ -4,8 +4,8 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>Opérateur — Doneo</title>
-  <!-- html5-qrcode pour scanner via caméra -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"></script>
+  <!-- ZXing — meilleur support iOS Safari pour codes-barres 1D -->
+  <script src="https://unpkg.com/@zxing/library@0.19.3/umd/index.min.js"></script>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
     body {
@@ -266,7 +266,7 @@
 
     <!-- Mode caméra -->
     <div id="modeCamera">
-      <div id="reader"></div>
+      <video id="reader" style="width:100%;border-radius:14px;background:#000;"></video>
       <div class="camera-hint">Pointez la caméra vers le code-barres du colis</div>
     </div>
 
@@ -304,7 +304,7 @@ let currentOperateur = 'Opérateur';
 let counters = { vert: 0, rouge: 0, orange: 0 };
 let recentScans = [];
 let autoTimer = null;
-let cameraScanner = null;
+let codeReader = null;
 let scanCooldown = false;  // empêche les doubles scans
 
 // ─── CHARGEMENT TOURNÉES ─────────────────────────────────────────────────
@@ -377,29 +377,41 @@ function setMode(mode) {
 }
 
 function startCamera() {
-  if (cameraScanner) return;
-  cameraScanner = new Html5Qrcode('reader');
-  cameraScanner.start(
-    { facingMode: 'environment' },
-    { fps: 10, qrbox: { width: 280, height: 140 }, aspectRatio: 1.6 },
-    (code) => {
-      if (scanCooldown) return;
-      sendScan(code);
-    },
-    () => {}
-  ).catch(err => {
-    document.getElementById('reader').innerHTML = `
-      <div style="padding:24px;text-align:center;color:#dc2626;background:#fef2f2;border-radius:12px">
-        ⚠️ Impossible d'accéder à la caméra.<br>
-        <small style="color:#9ca3af">Vérifiez les permissions ou utilisez la douchette.</small>
-      </div>`;
-  });
+  if (codeReader) return;
+  try {
+    const hints = new Map();
+    hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, [
+      ZXing.BarcodeFormat.EAN_13,
+      ZXing.BarcodeFormat.EAN_8,
+      ZXing.BarcodeFormat.CODE_128,
+      ZXing.BarcodeFormat.CODE_39,
+      ZXing.BarcodeFormat.ITF,
+    ]);
+    codeReader = new ZXing.BrowserMultiFormatReader(hints);
+    codeReader.decodeFromConstraints(
+      { audio: false, video: { facingMode: 'environment' } },
+      'reader',
+      (result, err) => {
+        if (result && !scanCooldown) {
+          sendScan(result.getText());
+        }
+      }
+    ).catch(() => {
+      document.getElementById('reader').outerHTML = `
+        <div style="padding:24px;text-align:center;color:#dc2626;background:#fef2f2;border-radius:12px">
+          ⚠️ Impossible d'accéder à la caméra.<br>
+          <small style="color:#9ca3af">Vérifiez les permissions Safari ou utilisez la douchette.</small>
+        </div>`;
+    });
+  } catch(e) {
+    codeReader = null;
+  }
 }
 
 function stopCamera() {
-  if (cameraScanner) {
-    cameraScanner.stop().catch(() => {});
-    cameraScanner = null;
+  if (codeReader) {
+    codeReader.reset();
+    codeReader = null;
   }
 }
 
